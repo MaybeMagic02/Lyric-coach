@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lyric Timing Coach</title>
+<style>
+:root{--bg:#eef1f6;--fg:#17203a;--mut:#5d6783;--card:#fff;--line:#d9dfeb;--acc:#3b5bdb;--ok:#1f8a5b;--bad:#d6336c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#10131c;--fg:#e7ebf5;--mut:#9aa5c2;--card:#1a1f2d;--line:#2d3550;--acc:#8ea2ff;--ok:#5fd3a0;--bad:#ff7a9c}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#10131c;--fg:#e7ebf5;--mut:#9aa5c2;--card:#1a1f2d;--line:#2d3550;--acc:#8ea2ff;--ok:#5fd3a0;--bad:#ff7a9c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0 auto;max-width:640px;padding:14px;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+h1{font-size:22px;margin:4px 0 2px}.m{color:var(--mut);font-size:14px;margin:2px 0}
+.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
+label{display:block;margin:8px 0;font-size:14px}input[type=file],select,textarea{width:100%;box-sizing:border-box;margin-top:4px;color:inherit;font:inherit}
+textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px}select{padding:6px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
+input[type=range]{width:100%}
+button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0;background:var(--acc);color:var(--bg);margin-right:8px}
+button:disabled{opacity:.4}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+#st{font-size:18px;font-weight:600;margin:12px 0 6px;min-height:28px}
+#meter{position:relative;height:16px;border-radius:8px;background:var(--line);margin:8px 0 2px;overflow:hidden}
+#zone{position:absolute;top:0;bottom:0;left:40%;width:20%;background:var(--ok);opacity:.35}
+#mk{position:absolute;top:0;bottom:0;width:6px;margin-left:-3px;left:50%;background:var(--fg);border-radius:3px;transition:left .2s}
+.ml{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+#lyr{position:relative;max-height:42vh;overflow:auto}
+.ln{padding:7px 6px;border-radius:6px;color:var(--mut);cursor:pointer}.ln.cur{background:var(--line);color:var(--fg);font-weight:600}
+.hide .ln span{filter:blur(8px)}
+.seg{display:flex;gap:8px;margin:10px 0}.seg button{flex:1;margin:0;background:var(--card);color:var(--fg);border:1px solid var(--line)}.seg button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+body.sy .pr{display:none}body:not(.sy) .sy{display:none}
+#tap{width:100%;margin:10px 0;padding:30px 10px;font-size:22px}#nx{font-size:20px;font-weight:600;min-height:56px;margin:8px 0;white-space:pre-line}
+</style></head><body>
+<h1>Lyric Timing Coach</h1>
+<p class="m">Use headphones. Works in Chrome on Android.</p>
+<div class="seg"><button id="mp" class="on">Practice</button><button id="ms">Sync timings</button></div>
+<div class="c">
+<label>1. Song file (MP3 from your phone)<input type="file" id="af" accept="audio/*"></label>
+<label class="pr">2. Synced lyrics file (.lrc)<input type="file" id="lf" accept=".lrc,.txt"></label>
+<details class="pr"><summary class="m">Or paste lyrics with timestamps</summary><textarea id="lt" rows="4" placeholder="[00:12.50] first line"></textarea><button id="pl" style="margin-top:6px">Use pasted lyrics</button></details>
+<label class="pr">Language<select id="lang"><option value="en-US">English</option><option value="ms-MY">Malay</option></select></label>
+</div>
+<div class="c pr">
+<button id="go">Start</button><button id="stop" disabled>Stop</button><button id="mic">Enable mic</button>
+<div id="st">Load a song and lyrics.</div>
+<div id="meter"><div id="zone"></div><div id="mk"></div></div>
+<div class="ml"><span>You’re ahead</span><span>You’re behind</span></div>
+<p class="m">Heard: <span id="heard">-</span></p>
+</div>
+<div class="c pr">
+<label>Tolerance: <b id="tolv">1.0</b>s<input type="range" id="tol" min="0.4" max="2.5" step="0.1" value="1"></label>
+<label>Mic delay fix: <b id="latv">0.6</b>s<input type="range" id="lat" min="0" max="1.5" step="0.1" value="0.6"></label>
+<label>Rewind lead-in: <b id="leadv">2.0</b>s<input type="range" id="lead" min="0" max="4" step="0.5" value="2"></label>
+<label>Lyrics timing offset: <b id="offv">0.0</b>s<input type="range" id="off" min="-20" max="20" step="0.1" value="0"></label>
+<label>Karaoke track: first sung line starts at (seconds)<input type="number" id="fl" step="0.1" placeholder="e.g. 14.5" style="width:100%;box-sizing:border-box;padding:6px;margin-top:4px;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;font:inherit"></label>
+<button id="fb">Shift lyrics to match</button>
+<label><input type="checkbox" id="miss"> Also rewind if I skip a line (experimental)</label>
+</div>
+<div class="c pr"><label><input type="checkbox" id="hide"> Hide lyrics (memory test)</label><div id="lyr"></div><p class="m">Tap a line to jump there.</p></div>
+<div class="c sy">
+<p class="m">Load the song above, paste plain lyrics (one line per row), press Start sync, then tap as each line begins.</p>
+<textarea id="syl" rows="6" placeholder="One lyric line per row"></textarea>
+<div style="margin-top:8px"><button id="sgo">Start sync</button><button id="sun" disabled>Undo last tap</button></div>
+<div id="nx">-</div>
+<button id="tap" disabled>Tap: line starts now</button>
+<p class="m" id="sp"></p>
+<textarea id="out" rows="6" readonly></textarea>
+<div style="margin-top:8px"><button id="m2" disabled>Shift -0.2s</button><button id="p2" disabled>Shift +0.2s</button></div>
+<div style="margin-top:8px"><button id="use" disabled>Use in Practice</button><button id="cp" disabled>Copy</button></div>
+</div>
+<audio id="a"></audio>
+<script>
+const $=id=>document.getElementById(id),V=id=>+$(id).value,au=$('a');
+let L=[],run=false,rec=null,cool=0,lastTail='',cur=-1;
+const W=s=>(s.toLowerCase().replace(/[’‘]/g,"'").match(/[\p{L}\p{N}']+/gu)||[]);
+const fmt=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
+function S(t,c){const e=$('st');e.textContent=t;e.style.color=c?'var(--'+c+')':''}
+function mark(d){$('mk').style.left=Math.max(0,Math.min(100,50+d/5*100))+'%'}
+function zone(){const w=V('tol')/5*100;$('zone').style.width=w*2+'%';$('zone').style.left=50-w+'%'}
+document.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{$(r.id+'v').textContent=(+r.value).toFixed(1);zone()});zone();
+function parse(t){const o=[];for(const raw of t.split(/\r?\n/)){const tg=[...raw.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];if(!tg.length)continue;const txt=raw.replace(/\[[^\]]*\]/g,'').trim();for(const m of tg){const v=+m[1]*60+ +m[2];o.push({t:v,t0:v,txt,done:0})}}
+o.sort((a,b)=>a.t-b.t);o.forEach((l,i)=>{l.w=W(l.txt);l.dur=Math.min(o[i+1]?o[i+1].t-l.t:5,7)||3});return o}
+function draw(){const d=$('lyr');d.innerHTML='';L.forEach(l=>{const e=document.createElement('div'),s=document.createElement('span');e.className='ln';s.textContent=fmt(l.t)+'  '+(l.txt||'♪');e.append(s);e.onclick=()=>{au.currentTime=Math.max(0,l.t-V('lead'));lastTail='';cool=performance.now()+V('lead')*1000+1500};d.append(e)})}
+const setL=t=>{$('off').value=0;$('offv').textContent='0.0';L=parse(t);if(L.length){draw();S(L.length+' lyric lines loaded.')}else S('No timestamps found. Use a synced .lrc file.','bad')};
+$('af').onchange=e=>{const f=e.target.files[0];if(!f)return;au.onerror=()=>{const r=new FileReader();r.onload=()=>{au.onerror=null;au.src=r.result};r.readAsDataURL(f)};au.src=URL.createObjectURL(f);S('Song loaded.')};
+$('lf').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(setL)};
+$('pl').onclick=()=>setL($('lt').value);
+$('hide').onchange=e=>$('lyr').classList.toggle('hide',e.target.checked);
+function mkRec(SR){rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang=$('lang').value;rec.onresult=hear;
+rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error)){halt();S('Mic blocked. Allow the microphone for this page in Chrome’s site settings. The page host may not allow it.','bad')}else if(e.error!=='no-speech'&&e.error!=='aborted')S('Mic error: '+e.error,'bad')};
+rec.onend=()=>{if(run)try{rec.start()}catch(_){}};try{rec.start()}catch(_){}}
+function halt(){run=false;try{rec.abort()}catch(_){}au.pause();$('go').disabled=false;$('stop').disabled=true}
+async function askMic(){const pp=document.permissionsPolicy||document.featurePolicy;
+if(pp&&pp.allowsFeature&&!pp.allowsFeature('microphone')){S('This page is embedded without microphone permission, so the browser can’t ask you. Try opening the link directly in Chrome, or host the file on your own page.','bad');return false}
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){S('This browser can’t reach the microphone here.','bad');return false}
+try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());S('Microphone allowed.','ok');return true}
+catch(e){S(e.name==='NotAllowedError'?'Microphone blocked. Tap the lock icon in Chrome’s address bar, allow the microphone, then reload. If no prompt ever appeared, the page host is blocking it.':'Mic error: '+e.name,'bad');return false}}
+$('mic').onclick=askMic;
+$('go').onclick=async()=>{if(!au.src||!L.length)return S('Load a song and lyrics first.','bad');const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return S('Speech recognition isn’t available. Use Chrome on Android.','bad');
+if(!(await askMic()))return;run=true;L.forEach(l=>l.done=0);lastTail='';mkRec(SR);au.play().catch(()=>S('Couldn’t play the song file.','bad'));cool=performance.now()+1500;$('go').disabled=true;$('stop').disabled=false;S('Listening. Sing along.')};
+$('stop').onclick=()=>{halt();S('Stopped.')};au.onended=()=>{if(run){halt();S('Song finished.')}};
+function back(l,msg){S(msg,'bad');au.pause();cool=performance.now()+1e6;lastTail='';au.currentTime=Math.max(0,l.t-V('lead'));L.forEach(x=>{if(x.t>=l.t)x.done=0});try{rec.abort()}catch(_){}
+setTimeout(()=>{if(!run)return;au.play();cool=performance.now()+V('lead')*1000+1500;S('Go!','acc')},1200)}
+function hear(e){const t=e.results[e.results.length-1][0].transcript;$('heard').textContent=t;
+if(performance.now()<cool||au.paused)return;
+const sw=W(t);if(sw.length<2)return;const n=Math.min(3,sw.length),tail=sw.slice(-n),key=tail.join(' ');if(key===lastTail)return;lastTail=key;
+const ct=au.currentTime,now=ct-V('lat');let b=null;
+for(const l of L){if(l.w.length<n||Math.abs(l.t-ct)>14)continue;
+for(let j=0;j+n<=l.w.length;j++){let ok=0;for(let k=0;k<n;k++)if(l.w[j+k]===tail[k])ok++;
+if(ok>=2){const d=now-(l.t+(j+n)/l.w.length*l.dur);if(!b||Math.abs(d)<Math.abs(b.d))b={l,d}}}}
+if(!b)return S('Heard you, but couldn’t match it to the lyrics.');
+b.l.done=1;const d=b.d;mark(d);
+if(Math.abs(d)>V('tol'))back(b.l,(d>0?'Behind':'Ahead')+' by '+Math.abs(d).toFixed(1)+'s. Rewinding…');
+else S('On time ('+(d>=0?'+':'')+d.toFixed(1)+'s)','ok')}
+setInterval(()=>{const ct=au.currentTime;let i=-1;for(let k=0;k<L.length;k++){if(L[k].t<=ct)i=k;else break}
+if(i!==cur){cur=i;const ks=$('lyr').children;for(let k=0;k<ks.length;k++)ks[k].classList.toggle('cur',k===i);if(i>=0)$('lyr').scrollTop=ks[i].offsetTop-$('lyr').clientHeight/2}
+if(run&&$('miss').checked&&!au.paused&&performance.now()>cool){const g=V('tol')+1.5;for(const l of L){if(l.w.length>2&&!l.done&&ct>l.t+l.dur+g&&ct<l.t+l.dur+g+3){back(l,'Missed a line. Rewinding…');break}}}},250);
+let sy=null;
+const lrc=(t,x)=>'['+String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60).toFixed(2).padStart(5,'0')+'] '+x;
+const sb=on=>['use','cp','m2','p2'].forEach(i=>$(i).disabled=!on);
+function mode(m){au.pause();if(run)$('stop').click();if(sy&&sy.i<sy.lines.length){sy=null;$('tap').disabled=true;$('sun').disabled=true}document.body.classList.toggle('sy',m==='sy');$('mp').classList.toggle('on',m!=='sy');$('ms').classList.toggle('on',m==='sy')}
+$('mp').onclick=()=>mode('p');$('ms').onclick=()=>mode('sy');
+function nxt(){const l=sy.lines,i=sy.i;$('nx').textContent=i<l.length?'Next: '+l[i]+(l[i+1]?'\nThen: '+l[i+1]:''):'All lines tapped.'}
+function build(){const o=sy.lines.map((x,i)=>lrc(sy.t[i],x)).join('\n');$('out').value=o;sb(true);try{localStorage.setItem('lrc',o)}catch(_){}}
+$('sgo').onclick=()=>{const ls=$('syl').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(!au.src)return($('nx').textContent='Load the song first.');if(!ls.length)return($('nx').textContent='Paste the lyrics first.');
+sy={lines:ls,t:[],i:0};au.currentTime=0;au.play().catch(()=>{});$('tap').disabled=false;$('sun').disabled=false;sb(false);$('out').value='';$('sp').textContent='';nxt()};
+$('tap').onpointerdown=e=>{if(!sy||sy.i>=sy.lines.length)return;e.preventDefault();sy.t.push(Math.max(0,au.currentTime-0.15));sy.i++;nxt();if(sy.i>=sy.lines.length){au.pause();$('tap').disabled=true;build()}};
+$('sun').onclick=()=>{if(!sy||!sy.i)return;sy.i--;const p=sy.t.pop();au.currentTime=Math.max(0,p-2);au.play();$('tap').disabled=false;sb(false);nxt()};
+const shift=d=>{sy.t=sy.t.map(t=>Math.max(0,t+d));build()};$('m2').onclick=()=>shift(-.2);$('p2').onclick=()=>shift(.2);
+$('use').onclick=()=>{setL($('out').value);mode('p')};
+$('cp').onclick=()=>{$('out').select();document.execCommand('copy');$('sp').textContent='Copied. Paste it into Notes to keep it.'};
+au.addEventListener('ended',()=>{if(sy&&sy.i<sy.lines.length)$('sp').textContent='The song ended before every line was tapped. Undo or start again.'});
+try{const s=localStorage.getItem('lrc');if(s){$('out').value=s;$('use').disabled=false;$('cp').disabled=false}}catch(_){}
+function applyOff(){const o=V('off');$('offv').textContent=o.toFixed(1);L.forEach(l=>{l.t=l.t0+o});draw()}
+$('off').addEventListener('input',applyOff);
+$('fb').onclick=()=>{const v=parseFloat($('fl').value),f=L.find(l=>l.w.length);if(!f||isNaN(v))return S('Load lyrics and enter a time first.','bad');$('off').value=Math.round((v-f.t0)*10)/10;applyOff();S('Shifted all lines by '+V('off').toFixed(1)+'s.')};
+</script></body></html>
